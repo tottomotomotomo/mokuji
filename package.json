@@ -1,0 +1,47 @@
+{
+  "name": "mokuji",
+  "displayName": "Mokuji",
+  "description": "CSS Table of Contents based on comments",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:css",
+    "onLanguage:scss",
+    "onLanguage:less"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mokuji-explorer",
+          "title": "Mokuji",
+          "icon": "$(list-unordered)"
+        }
+      ]
+    },
+    "views": {
+      "mokuji-explorer": [
+        {
+          "id": "mokujiView",
+          "name": "Table of Contents"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "16.x",
+    "typescript": "^5.0.0"
+  }
+}
