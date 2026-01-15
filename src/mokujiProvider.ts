@@ -86,7 +86,7 @@ class MokujiItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
-        this.description = `L ${this.line + 1}`;
+        this.description = `Line ${this.line + 1}`;
 
         this.command = {
             command: 'vscode.open',
