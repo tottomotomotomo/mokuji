@@ -1,18 +1,18 @@
-// # Main Styles
+/* # Main Styles - CSS Format */
 .container {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
 }
 
-// ## Layout
+/* ## Layout */
 .header {
   background: #333;
   color: white;
   padding: 20px;
 }
 
-// ### Navigation
+/* ### Navigation */
 .nav {
   display: flex;
   gap: 20px;
@@ -22,7 +22,7 @@
   padding: 10px;
 }
 
-// ## Content
+// ## Content - SCSS/LESS Format
 .main-content {
   padding: 40px;
 }
@@ -38,14 +38,14 @@ h2 {
   margin-bottom: 0.75rem;
 }
 
-// ## Footer
+/* ## Footer */
 .footer {
   background: #f5f5f5;
   padding: 30px;
   text-align: center;
 }
 
-// ### Social Links
+/* ### Social Links */
 .social {
   display: flex;
   justify-content: center;

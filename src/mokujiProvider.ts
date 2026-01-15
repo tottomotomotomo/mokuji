@@ -42,7 +42,13 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
             const text = line.text;
-            const match = text.match(/^\s*\/\/ (#+) (.*)$/);
+
+            // Support both // # and /* # */ comment formats
+            // Pattern 1: // # text (SCSS/LESS style)
+            // Pattern 2: /* # text */ (Standard CSS style)
+            const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
+            const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
+            const match = slashMatch || blockMatch;
 
             if (match) {
                 const level = match[1].length;
@@ -80,7 +86,7 @@ class MokujiItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
-        this.description = `Line ${this.line + 1}`;
+        this.description = `L ${this.line + 1}`;
 
         this.command = {
             command: 'vscode.open',
