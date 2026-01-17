@@ -1,8 +1,17 @@
 {
   "name": "mokuji",
   "displayName": "Mokuji",
+  "publisher": "tottomotomotomo",
   "description": "CSS Table of Contents based on comments",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tottomotomotomo/mokuji.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tottomotomotomo/mokuji/issues"
+  },
+  "homepage": "https://github.com/tottomotomotomo/mokuji#readme",
   "engines": {
     "vscode": "^1.80.0"
   },
