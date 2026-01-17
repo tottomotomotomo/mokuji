@@ -1,0 +1,37 @@
+/* # Main Styles - CSS Format */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ## Layout */
+.header {
+  background: #333;
+  color: white;
+  padding: 20px;
+}
+
+/* ### Navigation */
+.nav {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-item {
+  padding: 10px;
+}
+
+/* ## Footer */
+.footer {
+  background: #f5f5f5;
+  padding: 30px;
+  text-align: center;
+}
+
+/* ### Social Links */
+.social {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
