@@ -30,7 +30,7 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const langId = editor.document.languageId;
-                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html') {
+                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html' || langId === 'markdown') {
                     return Promise.resolve(this.parseDocument(editor.document));
                 }
             }
@@ -50,10 +50,13 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             // Pattern 1: // # text (SCSS/LESS style)
             // Pattern 2: /* # text */ (Standard CSS style)
             // Pattern 3: <!-- # text --> (HTML style)
+            // Pattern 4: # text (Markdown native headers)
             const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
             const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
             const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
-            const match = slashMatch || blockMatch || htmlMatch;
+            // Markdown: ATX-style headers, trailing hashes are optional and removed
+            const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
+            const match = slashMatch || blockMatch || htmlMatch || mdMatch;
 
             if (match) {
                 const level = match[1].length;
