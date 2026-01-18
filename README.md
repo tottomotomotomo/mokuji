@@ -1,88 +1,122 @@
-# Mokuji - CSS Table of Contents
+# Mokuji - Table of Contents Generator
 
-CSSファイル内のコメントを使って、サイドバーに目次（Mokuji）を表示するVS Code拡張機能です。
+A VS Code extension that displays a table of contents (Mokuji) in the sidebar based on comments and headings in your files.
 
-![Mokujiのスクリーンショット](images/screenshot.png)
+[日本語版 README](README.ja.md)
 
-## 機能
+![Mokuji Screenshot](images/screenshot.png)
 
-- CSSファイル内の特別なコメント形式を認識し、階層的な目次を自動生成
-- サイドバーに見やすいツリービューで表示
-- 目次項目をクリックして、該当のコード行へ即座にジャンプ
-- ファイル編集時にリアルタイムで目次を更新
-- CSS、SCSS、LESSファイルに対応
+## Features
 
-## 使用方法
+- Recognizes special comment formats and headings, automatically generates a hierarchical table of contents
+- Displays in an easy-to-read tree view in the sidebar
+- Click on table of contents items to instantly jump to the corresponding code line
+- Updates the table of contents in real-time when editing files
 
-### コメントの記述形式
+## Supported Languages
 
-2つのコメント形式をサポートしています：
+| Language | Format | Example |
+|----------|--------|---------|
+| CSS | Block comment | `/* # Section */` |
+| SCSS/LESS | Line comment | `// # Section` |
+| HTML | HTML comment | `<!-- # Section -->` |
+| Markdown | Native heading | `# Section` |
 
-#### 標準CSS形式
+## Usage
+
+### CSS / SCSS / LESS
 
 ```css
-/* # メインセクション */
+/* # Main Section */
 .main {
   color: blue;
 }
 
-/* ## サブセクション */
+/* ## Sub Section */
 .sub {
   color: red;
 }
 ```
-
-#### SCSS/LESS形式
 
 ```scss
-// # メインセクション
+// # Main Section
 .main {
   color: blue;
 }
 
-// ## サブセクション
+// ## Sub Section
 .sub {
   color: red;
 }
 ```
 
-### 階層レベル
+### HTML
 
-| 形式 | CSS標準 | SCSS/LESS |
-|------|---------|-----------|
-| レベル1 | `/* # テキスト */` | `// # テキスト` |
-| レベル2 | `/* ## テキスト */` | `// ## テキスト` |
-| レベル3 | `/* ### テキスト */` | `// ### テキスト` |
+```html
+<!-- # Header Section -->
+<header>
+  <!-- ## Navigation -->
+  <nav>...</nav>
+</header>
 
-### 目次の表示
+<!-- # Main Content -->
+<main>...</main>
+```
 
-1. CSSファイルを開く
-2. アクティビティバーの「Mokuji」アイコンをクリック
-3. サイドバーに目次が表示されます
-4. 目次項目をクリックすると、該当行へジャンプします
+### Markdown
 
-## インストール
+```markdown
+# Main Title
 
-### 開発版の実行
+## Section 1
 
-1. このリポジトリをクローン
-2. `npm install` で依存関係をインストール
-3. `npm run compile` でコンパイル
-4. F5キーを押してExtension Development Hostを起動
+### Subsection 1.1
 
-## 開発
+## Section 2
+```
+
+### Hierarchy Levels
+
+Use `#` symbols to indicate hierarchy depth (up to 6 levels):
+
+- `#` = Level 1
+- `##` = Level 2
+- `###` = Level 3
+- And so on...
+
+### Displaying the Table of Contents
+
+1. Open a supported file (CSS, SCSS, LESS, HTML, or Markdown)
+2. Click the "Mokuji" icon in the activity bar
+3. The table of contents will be displayed in the sidebar
+4. Click on a table of contents item to jump to the corresponding line
+
+## Installation
+
+### From VS Code Marketplace
+
+Search for "Mokuji" in the VS Code Extensions view and install.
+
+### Running the Development Version
+
+1. Clone this repository
+2. Install dependencies with `npm install`
+3. Compile with `npm run compile`
+4. Press F5 to launch the Extension Development Host
+
+## Development
 
 ```bash
-# 依存関係のインストール
+# Install dependencies
 npm install
 
-# TypeScriptのコンパイル
+# Compile TypeScript
 npm run compile
 
-# ウォッチモード（自動コンパイル）
+# Watch mode (auto-compile)
 npm run watch
 ```
 
-## ライセンス
+## License
 
 MIT
