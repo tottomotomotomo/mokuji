@@ -2,6 +2,22 @@
 
 All notable changes to the "Mokuji" extension will be documented in this file.
 
+## [0.0.2] - 2026-01-18
+
+### Added
+
+- HTML file support with comment format (`<!-- # text -->`)
+- Markdown file support with native heading format (`# text`)
+- Support for up to 6 hierarchy levels
+- English README as main documentation
+- Japanese README (README.ja.md)
+
+### Changed
+
+- Updated description to reflect multi-language support
+- Added `html` and `markdown` to activation events
+- Added `html`, `markdown`, `heading` to keywords
+
 ## [0.0.1] - 2026-01-17
 
 ### Added
