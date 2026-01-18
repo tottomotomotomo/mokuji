@@ -4,6 +4,19 @@
   "publisher": "tottomotomotomo",
   "description": "CSS Table of Contents based on comments",
   "version": "0.0.1",
+  "license": "MIT",
+  "icon": "icon.png",
+  "keywords": [
+    "css",
+    "scss",
+    "less",
+    "table of contents",
+    "toc",
+    "navigation",
+    "outline",
+    "comments",
+    "mokuji"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/tottomotomotomo/mokuji.git"
