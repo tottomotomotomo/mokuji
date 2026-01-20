@@ -2,20 +2,23 @@
   "name": "mokuji",
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
-  "description": "CSS Table of Contents based on comments",
-  "version": "0.0.1",
+  "description": "Table of Contents generator for CSS, HTML, and Markdown files",
+  "version": "0.0.2",
   "license": "MIT",
   "icon": "icon.png",
   "keywords": [
     "css",
     "scss",
     "less",
+    "html",
+    "markdown",
     "table of contents",
     "toc",
     "navigation",
     "outline",
     "comments",
-    "mokuji"
+    "mokuji",
+    "heading"
   ],
   "repository": {
     "type": "git",
@@ -34,7 +37,9 @@
   "activationEvents": [
     "onLanguage:css",
     "onLanguage:scss",
-    "onLanguage:less"
+    "onLanguage:less",
+    "onLanguage:html",
+    "onLanguage:markdown"
   ],
   "main": "./out/extension.js",
   "contributes": {

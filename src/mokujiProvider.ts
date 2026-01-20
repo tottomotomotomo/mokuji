@@ -28,8 +28,11 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             return Promise.resolve(element.children);
         } else {
             const editor = vscode.window.activeTextEditor;
-            if (editor && (editor.document.languageId === 'css' || editor.document.languageId === 'scss' || editor.document.languageId === 'less')) {
-                return Promise.resolve(this.parseDocument(editor.document));
+            if (editor) {
+                const langId = editor.document.languageId;
+                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html' || langId === 'markdown') {
+                    return Promise.resolve(this.parseDocument(editor.document));
+                }
             }
             return Promise.resolve([]);
         }
@@ -43,12 +46,17 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const line = document.lineAt(i);
             const text = line.text;
 
-            // Support both // # and /* # */ comment formats
+            // Support multiple comment formats based on language
             // Pattern 1: // # text (SCSS/LESS style)
             // Pattern 2: /* # text */ (Standard CSS style)
+            // Pattern 3: <!-- # text --> (HTML style)
+            // Pattern 4: # text (Markdown native headers)
             const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
             const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
-            const match = slashMatch || blockMatch;
+            const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
+            // Markdown: ATX-style headers, trailing hashes are optional and removed
+            const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
+            const match = slashMatch || blockMatch || htmlMatch || mdMatch;
 
             if (match) {
                 const level = match[1].length;
