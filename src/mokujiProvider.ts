@@ -4,9 +4,20 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
+    // Built-in supported language IDs
+    private static readonly BUILTIN_LANGUAGES = [
+        'css', 'scss', 'less', 'html', 'markdown',
+        'javascript', 'typescript', 'javascriptreact', 'typescriptreact'
+    ];
+
     constructor() {
         vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
         vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e));
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('mokuji.customPatterns')) {
+                this.refresh();
+            }
+        });
     }
 
     refresh(): void {
@@ -30,16 +41,21 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const langId = editor.document.languageId;
-                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html' || langId === 'markdown' ||
-                    langId === 'javascript' || langId === 'typescript' || langId === 'javascriptreact' || langId === 'typescriptreact') {
-                    return Promise.resolve(this.parseDocument(editor.document));
+                const customPatterns = vscode.workspace.getConfiguration('mokuji').get<Record<string, { pattern: string; enabled?: boolean }>>('customPatterns', {});
+                if (MokujiTreeDataProvider.BUILTIN_LANGUAGES.includes(langId) || this.hasCustomPattern(langId, customPatterns)) {
+                    return Promise.resolve(this.parseDocument(editor.document, customPatterns));
                 }
             }
             return Promise.resolve([]);
         }
     }
 
-    private parseDocument(document: vscode.TextDocument): MokujiItem[] {
+    private hasCustomPattern(langId: string, customPatterns: Record<string, { pattern: string; enabled?: boolean }>): boolean {
+        const config = customPatterns[langId];
+        return config !== undefined && config.enabled !== false;
+    }
+
+    private parseDocument(document: vscode.TextDocument, customPatterns: Record<string, { pattern: string; enabled?: boolean }> = {}): MokujiItem[] {
         const items: MokujiItem[] = [];
         const stack: { level: number, item: MokujiItem }[] = [];
 
@@ -60,7 +76,21 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
             // JSDoc: /** # text */ (single-line JSDoc comment)
             const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
-            const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch;
+
+            // Custom pattern from settings.json
+            // Group 1: hash symbols for level, Group 2: label text
+            const langId = document.languageId;
+            const customConfig = customPatterns[langId];
+            let customMatch: RegExpMatchArray | null = null;
+            if (customConfig && customConfig.enabled !== false) {
+                try {
+                    customMatch = text.match(new RegExp(customConfig.pattern));
+                } catch {
+                    // Invalid regex pattern is silently ignored
+                }
+            }
+
+            const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch || customMatch;
 
             if (match) {
                 const level = match[1].length;

@@ -66,6 +66,31 @@
           "name": "Table of Contents"
         }
       ]
+    },
+    "configuration": {
+      "title": "Mokuji",
+      "properties": {
+        "mokuji.customPatterns": {
+          "type": "object",
+          "default": {},
+          "description": "Custom regex patterns for each language ID. Each key is a language ID, and the value has 'pattern' (regex string with group 1 for level hashes and group 2 for label) and 'enabled' (boolean).",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string",
+                "description": "Regex pattern string. Group 1 must capture hash symbols (#) for level, group 2 must capture the label text."
+              },
+              "enabled": {
+                "type": "boolean",
+                "default": true,
+                "description": "Enable or disable this custom pattern."
+              }
+            },
+            "required": ["pattern"]
+          }
+        }
+      }
     }
   },
   "scripts": {
