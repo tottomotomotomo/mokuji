@@ -2,7 +2,7 @@
   "name": "mokuji",
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
-  "description": "Table of Contents generator for CSS, HTML, and Markdown files",
+  "description": "Table of Contents generator for CSS, HTML, Markdown, JavaScript, and TypeScript files",
   "version": "0.0.2",
   "license": "MIT",
   "icon": "icon.png",
@@ -18,7 +18,10 @@
     "outline",
     "comments",
     "mokuji",
-    "heading"
+    "heading",
+    "javascript",
+    "typescript",
+    "jsdoc"
   ],
   "repository": {
     "type": "git",
@@ -39,7 +42,11 @@
     "onLanguage:scss",
     "onLanguage:less",
     "onLanguage:html",
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact"
   ],
   "main": "./out/extension.js",
   "contributes": {

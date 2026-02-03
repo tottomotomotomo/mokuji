@@ -30,7 +30,8 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const langId = editor.document.languageId;
-                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html' || langId === 'markdown') {
+                if (langId === 'css' || langId === 'scss' || langId === 'less' || langId === 'html' || langId === 'markdown' ||
+                    langId === 'javascript' || langId === 'typescript' || langId === 'javascriptreact' || langId === 'typescriptreact') {
                     return Promise.resolve(this.parseDocument(editor.document));
                 }
             }
@@ -47,16 +48,19 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const text = line.text;
 
             // Support multiple comment formats based on language
-            // Pattern 1: // # text (SCSS/LESS style)
+            // Pattern 1: // # text (SCSS/LESS/JS/TS style)
             // Pattern 2: /* # text */ (Standard CSS style)
             // Pattern 3: <!-- # text --> (HTML style)
             // Pattern 4: # text (Markdown native headers)
+            // Pattern 5: /** # text */ (JSDoc style for JS/TS)
             const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
             const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
             const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
             // Markdown: ATX-style headers, trailing hashes are optional and removed
             const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
-            const match = slashMatch || blockMatch || htmlMatch || mdMatch;
+            // JSDoc: /** # text */ (single-line JSDoc comment)
+            const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
+            const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch;
 
             if (match) {
                 const level = match[1].length;
