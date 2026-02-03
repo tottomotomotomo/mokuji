@@ -38,15 +38,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:css",
-    "onLanguage:scss",
-    "onLanguage:less",
-    "onLanguage:html",
-    "onLanguage:markdown",
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:javascriptreact",
-    "onLanguage:typescriptreact"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -70,6 +62,14 @@
     "configuration": {
       "title": "Mokuji",
       "properties": {
+        "mokuji.excludeLanguages": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "description": "Language IDs to exclude from Mokuji. Example: [\"plaintext\", \"json\"]"
+        },
         "mokuji.customPatterns": {
           "type": "object",
           "default": {},

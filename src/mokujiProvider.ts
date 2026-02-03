@@ -4,17 +4,11 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-    // Built-in supported language IDs
-    private static readonly BUILTIN_LANGUAGES = [
-        'css', 'scss', 'less', 'html', 'markdown',
-        'javascript', 'typescript', 'javascriptreact', 'typescriptreact'
-    ];
-
     constructor() {
         vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
         vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e));
         vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('mokuji.customPatterns')) {
+            if (e.affectsConfiguration('mokuji')) {
                 this.refresh();
             }
         });
@@ -40,19 +34,16 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
         } else {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
+                const config = vscode.workspace.getConfiguration('mokuji');
+                const excludeLanguages = config.get<string[]>('excludeLanguages', []);
                 const langId = editor.document.languageId;
-                const customPatterns = vscode.workspace.getConfiguration('mokuji').get<Record<string, { pattern: string; enabled?: boolean }>>('customPatterns', {});
-                if (MokujiTreeDataProvider.BUILTIN_LANGUAGES.includes(langId) || this.hasCustomPattern(langId, customPatterns)) {
+                if (!excludeLanguages.includes(langId)) {
+                    const customPatterns = config.get<Record<string, { pattern: string; enabled?: boolean }>>('customPatterns', {});
                     return Promise.resolve(this.parseDocument(editor.document, customPatterns));
                 }
             }
             return Promise.resolve([]);
         }
-    }
-
-    private hasCustomPattern(langId: string, customPatterns: Record<string, { pattern: string; enabled?: boolean }>): boolean {
-        const config = customPatterns[langId];
-        return config !== undefined && config.enabled !== false;
     }
 
     private parseDocument(document: vscode.TextDocument, customPatterns: Record<string, { pattern: string; enabled?: boolean }> = {}): MokujiItem[] {
