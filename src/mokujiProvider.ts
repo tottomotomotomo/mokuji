@@ -35,57 +35,64 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const config = vscode.workspace.getConfiguration('mokuji');
-                const excludeLanguages = config.get<string[]>('excludeLanguages', []);
-                const langId = editor.document.languageId;
-                if (!excludeLanguages.includes(langId)) {
-                    const customPatterns = config.get<Record<string, { pattern: string; enabled?: boolean }>>('customPatterns', {});
-                    return Promise.resolve(this.parseDocument(editor.document, customPatterns));
-                }
+                const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
+                return Promise.resolve(this.parseDocument(editor.document, headingMarkers));
             }
             return Promise.resolve([]);
         }
     }
 
-    private parseDocument(document: vscode.TextDocument, customPatterns: Record<string, { pattern: string; enabled?: boolean }> = {}): MokujiItem[] {
+    private parseDocument(
+        document: vscode.TextDocument,
+        headingMarkers: Record<string, string[]> = {}
+    ): MokujiItem[] {
         const items: MokujiItem[] = [];
         const stack: { level: number, item: MokujiItem }[] = [];
+        const langId = document.languageId;
+
+        // Get heading markers for this language (e.g., ["@", "$", "&"])
+        const markers = headingMarkers[langId] || [];
 
         for (let i = 0; i < document.lineCount; i++) {
             const line = document.lineAt(i);
             const text = line.text;
 
-            // Support multiple comment formats based on language
-            // Pattern 1: // # text (SCSS/LESS/JS/TS style)
-            // Pattern 2: /* # text */ (Standard CSS style)
-            // Pattern 3: <!-- # text --> (HTML style)
-            // Pattern 4: # text (Markdown native headers)
-            // Pattern 5: /** # text */ (JSDoc style for JS/TS)
-            const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
-            const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
-            const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
-            // Markdown: ATX-style headers, trailing hashes are optional and removed
-            const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
-            // JSDoc: /** # text */ (single-line JSDoc comment)
-            const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
+            let level: number | null = null;
+            let label: string | null = null;
 
-            // Custom pattern from settings.json
-            // Group 1: hash symbols for level, Group 2: label text
-            const langId = document.languageId;
-            const customConfig = customPatterns[langId];
-            let customMatch: RegExpMatchArray | null = null;
-            if (customConfig && customConfig.enabled !== false) {
-                try {
-                    customMatch = text.match(new RegExp(customConfig.pattern));
-                } catch {
-                    // Invalid regex pattern is silently ignored
+            // Priority 1: Heading markers (if configured for this language)
+            if (markers.length > 0) {
+                const markerResult = this.matchHeadingMarker(text, markers);
+                if (markerResult) {
+                    level = markerResult.level;
+                    label = markerResult.label;
                 }
             }
 
-            const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch || customMatch;
+            // Priority 2: Default patterns (only if headingMarkers is NOT configured)
+            if (level === null && markers.length === 0) {
+                // Support multiple comment formats based on language
+                // Pattern 1: // # text (SCSS/LESS/JS/TS style)
+                // Pattern 2: /* # text */ (Standard CSS style)
+                // Pattern 3: <!-- # text --> (HTML style)
+                // Pattern 4: # text (Markdown native headers)
+                // Pattern 5: /** # text */ (JSDoc style for JS/TS)
+                const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
+                const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
+                const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
+                // Markdown: ATX-style headers, trailing hashes are optional and removed
+                const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
+                // JSDoc: /** # text */ (single-line JSDoc comment)
+                const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
 
-            if (match) {
-                const level = match[1].length;
-                const label = match[2].trim();
+                const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch;
+                if (match) {
+                    level = match[1].length;
+                    label = match[2].trim();
+                }
+            }
+
+            if (level !== null && label !== null) {
                 const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i);
 
                 // Find parent
@@ -106,6 +113,45 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
         }
 
         return items;
+    }
+
+    /**
+     * Match heading markers in a line of text.
+     * Supports common comment formats: #, //, block comments, HTML comments
+     * @param text The line text to match
+     * @param markers Array of markers for each level (index 0 = level 1)
+     * @returns level and label if matched, null otherwise
+     */
+    private matchHeadingMarker(text: string, markers: string[]): { level: number; label: string } | null {
+        for (let i = 0; i < markers.length; i++) {
+            const marker = markers[i];
+            const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // Pattern for different comment styles:
+            // - # marker text (Python, Ruby, Shell, YAML)
+            // - // marker text (JS, TS, C++, etc.)
+            // - /* marker text */ (CSS, C, etc.)
+            // - /** marker text */ (JSDoc)
+            // - <!-- marker text --> (HTML, XML)
+            const patterns = [
+                new RegExp(`^\\s*#\\s*${escapedMarker}\\s+(.+)$`),
+                new RegExp(`^\\s*\\/\\/\\s*${escapedMarker}\\s+(.+)$`),
+                new RegExp(`^\\s*\\/\\*\\s*${escapedMarker}\\s+(.+?)\\s*\\*\\/\\s*$`),
+                new RegExp(`^\\s*\\/\\*\\*\\s*${escapedMarker}\\s+(.+?)\\s*\\*\\/\\s*$`),
+                new RegExp(`^\\s*<!--\\s*${escapedMarker}\\s+(.+?)\\s*-->`)
+            ];
+
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    return {
+                        level: i + 1,
+                        label: match[1].trim()
+                    };
+                }
+            }
+        }
+        return null;
     }
 }
 

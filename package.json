@@ -62,32 +62,17 @@
     "configuration": {
       "title": "Mokuji",
       "properties": {
-        "mokuji.excludeLanguages": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "description": "Language IDs to exclude from Mokuji. Example: [\"plaintext\", \"json\"]"
-        },
-        "mokuji.customPatterns": {
+        "mokuji.headingMarkers": {
           "type": "object",
           "default": {},
-          "description": "Custom regex patterns for each language ID. Each key is a language ID, and the value has 'pattern' (regex string with group 1 for level hashes and group 2 for label) and 'enabled' (boolean).",
+          "description": "Simple heading markers for each language ID. Each key is a language ID, and the value is an array of markers for each level. Example: { \"python\": [\"@\", \"$\", \"&\"] } means '# @ text' is level 1, '# $ text' is level 2, '# & text' is level 3.",
           "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "pattern": {
-                "type": "string",
-                "description": "Regex pattern string. Group 1 must capture hash symbols (#) for level, group 2 must capture the label text."
-              },
-              "enabled": {
-                "type": "boolean",
-                "default": true,
-                "description": "Enable or disable this custom pattern."
-              }
+            "type": "array",
+            "items": {
+              "type": "string"
             },
-            "required": ["pattern"]
+            "maxItems": 6,
+            "description": "Array of markers for levels 1-6. Example: [\"@\", \"$\", \"&\"] or [\"MARK:\", \"MARK::\", \"MARK:::\"]"
           }
         }
       }
