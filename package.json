@@ -3,7 +3,7 @@
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
   "description": "Table of Contents generator for CSS, HTML, Markdown, JavaScript, and TypeScript files",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "license": "MIT",
   "icon": "icon.png",
   "keywords": [
