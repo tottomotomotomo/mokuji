@@ -4,6 +4,9 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
+    // Preserve the last document to maintain TOC when activeTextEditor becomes undefined
+    private lastDocument: vscode.TextDocument | undefined;
+
     constructor() {
         vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
         vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e));
@@ -33,10 +36,25 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             return Promise.resolve(element.children);
         } else {
             const editor = vscode.window.activeTextEditor;
-            if (editor) {
+
+            // Use active editor's document if available, otherwise use last document
+            const document = editor?.document ?? this.lastDocument;
+
+            if (document) {
+                // Update lastDocument only when we have a valid text editor
+                if (editor) {
+                    this.lastDocument = document;
+                }
+
                 const config = vscode.workspace.getConfiguration('mokuji');
                 const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
-                return Promise.resolve(this.parseDocument(editor.document, headingMarkers));
+                const items = this.parseDocument(document, headingMarkers);
+
+                // Add file name header as the first item
+                const fileName = document.uri.path.split('/').pop() || '';
+                const fileHeader = new MokujiFileHeader(fileName, document.uri);
+
+                return Promise.resolve([fileHeader, ...items]);
             }
             return Promise.resolve([]);
         }
@@ -49,6 +67,7 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
         const items: MokujiItem[] = [];
         const stack: { level: number, item: MokujiItem }[] = [];
         const langId = document.languageId;
+        const documentUri = document.uri;
 
         // Get heading markers for this language (e.g., ["@", "$", "&"])
         const markers = headingMarkers[langId] || [];
@@ -93,7 +112,7 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             }
 
             if (level !== null && label !== null) {
-                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i);
+                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri);
 
                 // Find parent
                 while (stack.length > 0 && stack[stack.length - 1].level >= level) {
@@ -161,7 +180,8 @@ class MokujiItem extends vscode.TreeItem {
     constructor(
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
-        public readonly line: number
+        public readonly line: number,
+        public readonly documentUri: vscode.Uri
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
@@ -171,12 +191,26 @@ class MokujiItem extends vscode.TreeItem {
             command: 'vscode.open',
             title: 'Open Line',
             arguments: [
-                vscode.window.activeTextEditor?.document.uri,
+                documentUri,
                 {
                     selection: new vscode.Range(this.line, 0, this.line, 0),
                     preview: true
                 }
             ]
+        };
+    }
+}
+
+class MokujiFileHeader extends MokujiItem {
+    constructor(fileName: string, documentUri: vscode.Uri) {
+        super(fileName, vscode.TreeItemCollapsibleState.None, 0, documentUri);
+        this.iconPath = new vscode.ThemeIcon('file');
+        this.description = '';
+        this.tooltip = documentUri.fsPath;
+        this.command = {
+            command: 'vscode.open',
+            title: 'Open File',
+            arguments: [documentUri]
         };
     }
 }
