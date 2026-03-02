@@ -2,8 +2,8 @@
   "name": "mokuji",
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
-  "description": "Table of Contents generator for CSS, HTML, and Markdown files",
-  "version": "0.0.2",
+  "description": "Table of Contents generator for CSS, HTML, Markdown, JavaScript, and TypeScript files",
+  "version": "0.1.0",
   "license": "MIT",
   "icon": "icon.png",
   "keywords": [
@@ -18,7 +18,10 @@
     "outline",
     "comments",
     "mokuji",
-    "heading"
+    "heading",
+    "javascript",
+    "typescript",
+    "jsdoc"
   ],
   "repository": {
     "type": "git",
@@ -35,11 +38,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onLanguage:css",
-    "onLanguage:scss",
-    "onLanguage:less",
-    "onLanguage:html",
-    "onLanguage:markdown"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -59,6 +58,24 @@
           "name": "Table of Contents"
         }
       ]
+    },
+    "configuration": {
+      "title": "Mokuji",
+      "properties": {
+        "mokuji.headingMarkers": {
+          "type": "object",
+          "default": {},
+          "description": "Simple heading markers for each language ID. Each key is a language ID, and the value is an array of markers for each level. Example: { \"python\": [\"@\", \"$\", \"&\"] } means '# @ text' is level 1, '# $ text' is level 2, '# & text' is level 3.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 6,
+            "description": "Array of markers for levels 1-6. Example: [\"@\", \"$\", \"&\"] or [\"MARK:\", \"MARK::\", \"MARK:::\"]"
+          }
+        }
+      }
     }
   },
   "scripts": {

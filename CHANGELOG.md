@@ -2,6 +2,30 @@
 
 All notable changes to the "Mokuji" extension will be documented in this file.
 
+## [0.1.0] - 2026-02-07
+
+### Added
+
+- JavaScript/TypeScript file support (#10)
+  - Line comment format: `// # Section`
+  - JSDoc comment format: `/** # Section */`
+- Custom heading markers setting `mokuji.headingMarkers` (#11)
+  - Define custom markers per language (e.g., `["@", "$", "&"]`)
+  - Replaces default `#` pattern when configured for a language
+- Preserve TOC when WebView is displayed (#13)
+  - TOC remains visible during Settings, Markdown preview, etc.
+  - File name shown at top of TOC to indicate current file
+
+### Changed
+
+- Updated README to emphasize Mokuji as comment-based extension to standard Outline (#14)
+- Added JavaScript/TypeScript and headingMarkers documentation to README
+
+### Removed
+
+- `excludeLanguages` setting (deemed unnecessary)
+- `customPatterns` setting (replaced by simpler `headingMarkers`)
+
 ## [0.0.2] - 2026-01-18
 
 ### Added
