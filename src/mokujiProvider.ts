@@ -1,5 +1,44 @@
 import * as vscode from 'vscode';
 
+// グループ1: ハッシュ記号(1-6個) = レベル
+// グループ2: ヘッダーテキスト = ラベル
+type PatternName = 'slash' | 'block' | 'html' | 'md' | 'jsdoc' | 'hashComment' | 'jsxBlock';
+
+const PATTERNS: Record<PatternName, RegExp> = {
+    // // # text (SCSS/LESS/JS/TS/Go style)
+    slash:       /^\s*\/\/ (#+) (.*)$/,
+    // /* # text */ (CSS/SCSS/LESS/Go style)
+    block:       /^\s*\/\* (#+) (.*?) \*\/\s*$/,
+    // <!-- # text --> (HTML/Vue/Svelte style)
+    html:        /^\s*<!--\s*(#+)\s*(.*?)\s*-->/,
+    // # text (Markdown native headers, trailing hashes are optional and removed)
+    md:          /^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/,
+    // /** # text */ (JSDoc style for JS/TS/Java)
+    jsdoc:       /^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/,
+    // # # text (Python: hash comment with level marker)
+    // 先頭の # はコメント記号、その後の #+  がレベル指定
+    hashComment: /^\s*#\s+(#{1,6})\s+(.+)$/,
+    // {/* # text */} (JSX/TSX style)
+    jsxBlock:    /^\s*\{\/\*\s*(#+)\s*(.*?)\s*\*\/\}\s*$/,
+};
+
+const LANGUAGE_PATTERNS: Record<string, PatternName[]> = {
+    css:              ['block'],
+    scss:             ['slash', 'block'],
+    less:             ['slash', 'block'],
+    html:             ['html'],
+    markdown:         ['md'],
+    javascript:       ['slash', 'block', 'jsdoc'],
+    typescript:       ['slash', 'block', 'jsdoc'],
+    javascriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
+    typescriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
+    python:           ['hashComment'],
+    java:             ['slash', 'block', 'jsdoc'],
+    go:               ['slash', 'block'],
+    vue:              ['html', 'slash', 'block', 'jsdoc'],
+    svelte:           ['html', 'slash', 'block', 'jsdoc'],
+};
+
 export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
@@ -89,25 +128,18 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             }
 
             // Priority 2: Default patterns (only if headingMarkers is NOT configured)
+            // 言語IDに対応するパターンのみ試行する（未登録言語は検出しない）
             if (level === null && markers.length === 0) {
-                // Support multiple comment formats based on language
-                // Pattern 1: // # text (SCSS/LESS/JS/TS style)
-                // Pattern 2: /* # text */ (Standard CSS style)
-                // Pattern 3: <!-- # text --> (HTML style)
-                // Pattern 4: # text (Markdown native headers)
-                // Pattern 5: /** # text */ (JSDoc style for JS/TS)
-                const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
-                const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
-                const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
-                // Markdown: ATX-style headers, trailing hashes are optional and removed
-                const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
-                // JSDoc: /** # text */ (single-line JSDoc comment)
-                const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
-
-                const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch;
-                if (match) {
-                    level = match[1].length;
-                    label = match[2].trim();
+                const activePatternNames = LANGUAGE_PATTERNS[langId];
+                if (activePatternNames) {
+                    for (const patternName of activePatternNames) {
+                        const match = text.match(PATTERNS[patternName]);
+                        if (match) {
+                            level = match[1].length;
+                            label = match[2].trim();
+                            break;
+                        }
+                    }
                 }
             }
 
