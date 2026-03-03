@@ -74,6 +74,11 @@
             "maxItems": 6,
             "description": "Array of markers for levels 1-6. Example: [\"@\", \"$\", \"&\"] or [\"MARK:\", \"MARK::\", \"MARK:::\"]"
           }
+        },
+        "mokuji.showLineNumber": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show line numbers next to each item in the Mokuji panel."
         }
       }
     }

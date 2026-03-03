@@ -87,7 +87,8 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
 
                 const config = vscode.workspace.getConfiguration('mokuji');
                 const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
-                const items = this.parseDocument(document, headingMarkers);
+                const showLineNumber = config.get<boolean>('showLineNumber', true);
+                const items = this.parseDocument(document, headingMarkers, showLineNumber);
 
                 // Add file name header as the first item
                 const fileName = document.uri.path.split('/').pop() || '';
@@ -101,7 +102,8 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
 
     private parseDocument(
         document: vscode.TextDocument,
-        headingMarkers: Record<string, string[]> = {}
+        headingMarkers: Record<string, string[]> = {},
+        showLineNumber: boolean = true
     ): MokujiItem[] {
         const items: MokujiItem[] = [];
         const stack: { level: number, item: MokujiItem }[] = [];
@@ -144,7 +146,7 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
             }
 
             if (level !== null && label !== null) {
-                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri);
+                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri, showLineNumber);
 
                 // Find parent
                 while (stack.length > 0 && stack[stack.length - 1].level >= level) {
@@ -213,11 +215,12 @@ class MokujiItem extends vscode.TreeItem {
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly line: number,
-        public readonly documentUri: vscode.Uri
+        public readonly documentUri: vscode.Uri,
+        showLineNumber: boolean = true
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
-        this.description = `Line ${this.line + 1}`;
+        this.description = showLineNumber ? `Line ${this.line + 1}` : '';
 
         this.command = {
             command: 'vscode.open',
