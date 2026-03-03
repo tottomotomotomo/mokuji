@@ -4,6 +4,17 @@ import * as vscode from 'vscode';
 // グループ2: ヘッダーテキスト = ラベル
 type PatternName = 'slash' | 'block' | 'html' | 'md' | 'jsdoc' | 'hashComment' | 'jsxBlock';
 
+// .vscode/mokuji.json のワークスペース設定の型
+interface WorkspacePattern {
+    regex: string;      // 正規表現文字列
+    levelGroup: number; // レベルを表すキャプチャグループ番号（1-indexed）
+    labelGroup: number; // ラベルを表すキャプチャグループ番号（1-indexed）
+}
+
+interface WorkspaceConfig {
+    parsers: Record<string, { patterns: WorkspacePattern[] }>;
+}
+
 const PATTERNS: Record<PatternName, RegExp> = {
     // // # text (SCSS/LESS/JS/TS/Go style)
     slash:       /^\s*\/\/ (#+) (.*)$/,
@@ -46,6 +57,9 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     // Preserve the last document to maintain TOC when activeTextEditor becomes undefined
     private lastDocument: vscode.TextDocument | undefined;
 
+    // .vscode/mokuji.json のキャッシュ
+    private workspaceConfig: WorkspaceConfig | null = null;
+
     constructor() {
         vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
         vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e));
@@ -54,6 +68,31 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
                 this.refresh();
             }
         });
+
+        // ワークスペース設定を初回読み込み
+        this.loadWorkspaceConfig();
+
+        // .vscode/mokuji.json の変更を監視
+        const watcher = vscode.workspace.createFileSystemWatcher('**/.vscode/mokuji.json');
+        watcher.onDidChange(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
+        watcher.onDidCreate(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
+        watcher.onDidDelete(() => { this.workspaceConfig = null; this.refresh(); });
+    }
+
+    private async loadWorkspaceConfig(): Promise<void> {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            this.workspaceConfig = null;
+            return;
+        }
+
+        const configUri = vscode.Uri.joinPath(folders[0].uri, '.vscode', 'mokuji.json');
+        try {
+            const data = await vscode.workspace.fs.readFile(configUri);
+            this.workspaceConfig = JSON.parse(Buffer.from(data).toString('utf8'));
+        } catch {
+            this.workspaceConfig = null;
+        }
     }
 
     refresh(): void {
@@ -127,9 +166,30 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
                 }
             }
 
-            // Priority 2: Default patterns (only if headingMarkers is NOT configured)
-            // 言語IDに対応するパターンのみ試行する（未登録言語は検出しない）
+            // Priority 2: Workspace patterns (.vscode/mokuji.json)
+            // headingMarkersが未設定かつワークスペース設定がある場合に適用
             if (level === null && markers.length === 0) {
+                const wsPatterns = this.workspaceConfig?.parsers?.[langId]?.patterns;
+                if (wsPatterns) {
+                    for (const wp of wsPatterns) {
+                        try {
+                            const match = text.match(new RegExp(wp.regex));
+                            if (match) {
+                                const rawLevel = match[wp.levelGroup];
+                                level = typeof rawLevel === 'string' ? rawLevel.length : null;
+                                label = match[wp.labelGroup]?.trim() ?? null;
+                                break;
+                            }
+                        } catch {
+                            // 無効な正規表現はスキップ
+                        }
+                    }
+                }
+            }
+
+            // Priority 3: Default patterns (only if headingMarkers and workspace patterns are NOT configured)
+            // 言語IDに対応するパターンのみ試行する（未登録言語は検出しない）
+            if (level === null && markers.length === 0 && !this.workspaceConfig?.parsers?.[langId]) {
                 const activePatternNames = LANGUAGE_PATTERNS[langId];
                 if (activePatternNames) {
                     for (const patternName of activePatternNames) {
