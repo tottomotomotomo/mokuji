@@ -2,6 +2,27 @@
 
 All notable changes to the "Mokuji" extension will be documented in this file.
 
+## [0.2.0] - 2026-03-04
+
+### Added
+
+- Language-aware parser: pattern detection now restricted by language ID (#20)
+  - Unregistered languages produce no output (use `headingMarkers` for custom support)
+- Python file support with hash comment format (`# # Section`) (#21)
+- Java file support (`// # Section`, `/* # Section */`, `/** # Section */`) (#21)
+- Go file support (`// # Section`, `/* # Section */`) (#21)
+- Vue file support (`<!-- # Section -->`, `// # Section`, `/* # Section */`, `/** # Section */`) (#22)
+- Svelte file support (same as Vue) (#22)
+- React JSX/TSX file support (`// # Section`, `/* # Section */`, `/** # Section */`, `{/* # Section */}`) (#22)
+- Workspace-level settings via `.vscode/mokuji.json` (#23)
+  - Define custom regex patterns per language with `levelGroup` and `labelGroup`
+  - Changes applied in real time via file system watcher
+- `mokuji.showLineNumber` setting to show/hide "Line XX" in panel items (default: `true`) (#24)
+
+### Changed
+
+- Reorganized sample files into `samples/` directory, renamed from `test.*` to `sample.*` (#25)
+
 ## [0.1.0] - 2026-02-07
 
 ### Added
