@@ -1,11 +1,64 @@
 import * as vscode from 'vscode';
 
+// グループ1: ハッシュ記号(1-6個) = レベル
+// グループ2: ヘッダーテキスト = ラベル
+type PatternName = 'slash' | 'block' | 'html' | 'md' | 'jsdoc' | 'hashComment' | 'jsxBlock';
+
+// .vscode/mokuji.json のワークスペース設定の型
+interface WorkspacePattern {
+    regex: string;      // 正規表現文字列
+    levelGroup: number; // レベルを表すキャプチャグループ番号（1-indexed）
+    labelGroup: number; // ラベルを表すキャプチャグループ番号（1-indexed）
+}
+
+interface WorkspaceConfig {
+    parsers: Record<string, { patterns: WorkspacePattern[] }>;
+}
+
+const PATTERNS: Record<PatternName, RegExp> = {
+    // // # text (SCSS/LESS/JS/TS/Go style)
+    slash:       /^\s*\/\/ (#+) (.*)$/,
+    // /* # text */ (CSS/SCSS/LESS/Go style)
+    block:       /^\s*\/\* (#+) (.*?) \*\/\s*$/,
+    // <!-- # text --> (HTML/Vue/Svelte style)
+    html:        /^\s*<!--\s*(#+)\s*(.*?)\s*-->/,
+    // # text (Markdown native headers, trailing hashes are optional and removed)
+    md:          /^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/,
+    // /** # text */ (JSDoc style for JS/TS/Java)
+    jsdoc:       /^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/,
+    // # # text (Python: hash comment with level marker)
+    // 先頭の # はコメント記号、その後の #+  がレベル指定
+    hashComment: /^\s*#\s+(#{1,6})\s+(.+)$/,
+    // {/* # text */} (JSX/TSX style)
+    jsxBlock:    /^\s*\{\/\*\s*(#+)\s*(.*?)\s*\*\/\}\s*$/,
+};
+
+const LANGUAGE_PATTERNS: Record<string, PatternName[]> = {
+    css:              ['block'],
+    scss:             ['slash', 'block'],
+    less:             ['slash', 'block'],
+    html:             ['html'],
+    markdown:         ['md'],
+    javascript:       ['slash', 'block', 'jsdoc'],
+    typescript:       ['slash', 'block', 'jsdoc'],
+    javascriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
+    typescriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
+    python:           ['hashComment'],
+    java:             ['slash', 'block', 'jsdoc'],
+    go:               ['slash', 'block'],
+    vue:              ['html', 'slash', 'block', 'jsdoc'],
+    svelte:           ['html', 'slash', 'block', 'jsdoc'],
+};
+
 export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     // Preserve the last document to maintain TOC when activeTextEditor becomes undefined
     private lastDocument: vscode.TextDocument | undefined;
+
+    // .vscode/mokuji.json のキャッシュ
+    private workspaceConfig: WorkspaceConfig | null = null;
 
     constructor() {
         vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
@@ -15,6 +68,31 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
                 this.refresh();
             }
         });
+
+        // ワークスペース設定を初回読み込み
+        this.loadWorkspaceConfig();
+
+        // .vscode/mokuji.json の変更を監視
+        const watcher = vscode.workspace.createFileSystemWatcher('**/.vscode/mokuji.json');
+        watcher.onDidChange(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
+        watcher.onDidCreate(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
+        watcher.onDidDelete(() => { this.workspaceConfig = null; this.refresh(); });
+    }
+
+    private async loadWorkspaceConfig(): Promise<void> {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            this.workspaceConfig = null;
+            return;
+        }
+
+        const configUri = vscode.Uri.joinPath(folders[0].uri, '.vscode', 'mokuji.json');
+        try {
+            const data = await vscode.workspace.fs.readFile(configUri);
+            this.workspaceConfig = JSON.parse(Buffer.from(data).toString('utf8'));
+        } catch {
+            this.workspaceConfig = null;
+        }
     }
 
     refresh(): void {
@@ -48,7 +126,8 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
 
                 const config = vscode.workspace.getConfiguration('mokuji');
                 const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
-                const items = this.parseDocument(document, headingMarkers);
+                const showLineNumber = config.get<boolean>('showLineNumber', true);
+                const items = this.parseDocument(document, headingMarkers, showLineNumber);
 
                 // Add file name header as the first item
                 const fileName = document.uri.path.split('/').pop() || '';
@@ -62,7 +141,8 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
 
     private parseDocument(
         document: vscode.TextDocument,
-        headingMarkers: Record<string, string[]> = {}
+        headingMarkers: Record<string, string[]> = {},
+        showLineNumber: boolean = true
     ): MokujiItem[] {
         const items: MokujiItem[] = [];
         const stack: { level: number, item: MokujiItem }[] = [];
@@ -88,31 +168,45 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
                 }
             }
 
-            // Priority 2: Default patterns (only if headingMarkers is NOT configured)
+            // Priority 2: Workspace patterns (.vscode/mokuji.json)
+            // headingMarkersが未設定かつワークスペース設定がある場合に適用
             if (level === null && markers.length === 0) {
-                // Support multiple comment formats based on language
-                // Pattern 1: // # text (SCSS/LESS/JS/TS style)
-                // Pattern 2: /* # text */ (Standard CSS style)
-                // Pattern 3: <!-- # text --> (HTML style)
-                // Pattern 4: # text (Markdown native headers)
-                // Pattern 5: /** # text */ (JSDoc style for JS/TS)
-                const slashMatch = text.match(/^\s*\/\/ (#+) (.*)$/);
-                const blockMatch = text.match(/^\s*\/\* (#+) (.*?) \*\/\s*$/);
-                const htmlMatch = text.match(/^\s*<!--\s*(#+)\s*(.*?)\s*-->/);
-                // Markdown: ATX-style headers, trailing hashes are optional and removed
-                const mdMatch = text.match(/^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/);
-                // JSDoc: /** # text */ (single-line JSDoc comment)
-                const jsdocMatch = text.match(/^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/);
+                const wsPatterns = this.workspaceConfig?.parsers?.[langId]?.patterns;
+                if (wsPatterns) {
+                    for (const wp of wsPatterns) {
+                        try {
+                            const match = text.match(new RegExp(wp.regex));
+                            if (match) {
+                                const rawLevel = match[wp.levelGroup];
+                                level = typeof rawLevel === 'string' ? rawLevel.length : null;
+                                label = match[wp.labelGroup]?.trim() ?? null;
+                                break;
+                            }
+                        } catch {
+                            // 無効な正規表現はスキップ
+                        }
+                    }
+                }
+            }
 
-                const match = slashMatch || blockMatch || htmlMatch || mdMatch || jsdocMatch;
-                if (match) {
-                    level = match[1].length;
-                    label = match[2].trim();
+            // Priority 3: Default patterns (only if headingMarkers and workspace patterns are NOT configured)
+            // 言語IDに対応するパターンのみ試行する（未登録言語は検出しない）
+            if (level === null && markers.length === 0 && !this.workspaceConfig?.parsers?.[langId]) {
+                const activePatternNames = LANGUAGE_PATTERNS[langId];
+                if (activePatternNames) {
+                    for (const patternName of activePatternNames) {
+                        const match = text.match(PATTERNS[patternName]);
+                        if (match) {
+                            level = match[1].length;
+                            label = match[2].trim();
+                            break;
+                        }
+                    }
                 }
             }
 
             if (level !== null && label !== null) {
-                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri);
+                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri, showLineNumber);
 
                 // Find parent
                 while (stack.length > 0 && stack[stack.length - 1].level >= level) {
@@ -181,11 +275,12 @@ class MokujiItem extends vscode.TreeItem {
         public readonly label: string,
         public collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly line: number,
-        public readonly documentUri: vscode.Uri
+        public readonly documentUri: vscode.Uri,
+        showLineNumber: boolean = true
     ) {
         super(label, collapsibleState);
         this.tooltip = `${this.label}`;
-        this.description = `Line ${this.line + 1}`;
+        this.description = showLineNumber ? `Line ${this.line + 1}` : '';
 
         this.command = {
             command: 'vscode.open',
