@@ -16,6 +16,10 @@ VS Code標準のアウトラインがコード構造（関数、クラス等）�
 - ファイル編集時にリアルタイムで目次を更新
 - 標準で14種類の言語IDに対応
 - 任意の言語に対応するカスタム見出しマーカー（`mokuji.headingMarkers`）およびワークスペース正規表現設定（`.vscode/mokuji.json`）
+- エディタのカーソル移動に連動した現在セクションのハイライト（`mokuji.syncCursor`）、すべて折りたたむ（Collapse All）ボタン、前後のセクションへのショートカットジャンプ
+- セクション見出しの挿入コマンド（`Mokuji: Insert Section Heading`）およびコメント内での `#` スニペット補完
+- 見出しコメントの記法ミス・階層飛ばし・重複見出しをリアルタイムに検出するLint診断とワンクリックQuick Fix（`Ctrl+.` / `Cmd+.`）
+- 100%オフラインで動作しつつ、VS Code組み込みのLanguage Model API（`vscode.lm`）が利用可能な場合はAI機能を自動強化（Diffプレビュー付きセクション提案、`#mokujiToc` エージェントツール、AI向けルールファイル生成）
 
 ## 対応言語
 
@@ -204,6 +208,46 @@ public class UserService {
 3. サイドバーに目次が表示されます
 4. 目次項目をクリックすると、該当行へジャンプします
 
+## ナビゲーション・編集支援
+
+### カーソル連動とツリー操作
+
+エディタ内でカーソルを移動すると、現在位置に対応するセクションがMokujiサイドバー上で自動的にハイライト表示されます（`mokuji.syncCursor`、デフォルト: `true`）。また、Mokujiパネル上部の **Collapse All（すべて折りたたむ）** ボタンからネストされた項目を一括で折りたためます。
+
+### コマンドとショートカットキー
+
+| コマンド | Win / Linux | macOS | 説明 |
+|----------|-------------|-------|------|
+| `Mokuji: Go to Next Section` | `Ctrl+Alt+]` | `Cmd+Alt+]` | ファイル内の次のセクション見出しへジャンプ |
+| `Mokuji: Go to Previous Section` | `Ctrl+Alt+[` | `Cmd+Alt+[` | ファイル内の前のセクション見出しへジャンプ |
+| `Mokuji: Insert Section Heading` | — | — | レベル（1〜6）とタイトルを選択して、現在の言語に適した見出しコメントを挿入 |
+| `Mokuji: Refresh Table of Contents` | — | — | 目次ツリーを手動で再読み込み |
+
+### コメント内のスニペット補完
+
+対応言語のコメント内で `#` を入力すると、現在の言語やカスタムマーカー設定に合わせたMokuji見出し（レベル1〜6）の入力補完候補が表示されます。
+
+## 見出しLint & Quick Fix
+
+Mokujiは見出しコメントのよくある記述ミスを自動検出し（`mokuji.lint.enabled`、デフォルト: `true`）、**Quick Fix**（`Ctrl+.` / `Cmd+.`）でワンクリック修正を提供します：
+
+- **スペース不足の検出**: `//# Section` や `// #Section` のようなスペース抜けの見出しコメントを検出し、正しい形式（`// # Section`）へ整形します。
+- **階層レベルの飛び越し**: `#` の直後に `###` が続くなど、見出しレベルが2段階以上深くなっている箇所を警告し、適切なレベル（`##`）へ修正します。
+- **同一階層での重複見出し**: 同じ親セクション配下に同名の兄弟見出しが存在する場合に警告を表示します。
+
+## AI支援と `vscode.lm` 連携
+
+> **AI拡張なしでも100%オフラインで動作:** MokujiはGitHub CopilotなどのAI拡張機能がなくても、すべての基本機能（目次生成・ナビゲーション・挿入・Lint・オフライン構造解析によるセクション提案）が完全にオフラインで動作します。VS Code組み込みのLanguage Model API（`vscode.lm` / GitHub Copilot等）が利用可能で、`mokuji.ai.enabled` が `"auto"`（デフォルト）の場合は自動的にAI機能が有効になります。
+
+1. **セクション見出しの自動提案 (`Mokuji: Suggest Section Headings`)**
+   Mokujiパネル上部の `$(sparkle)` ボタンをクリックすると、現在のファイルに対して論理的なセクション見出しコメントを提案し、適用前に **Diffプレビュー** で変更内容を確認できます（`Mokuji: Apply Suggested Section Headings` で適用）。
+   - `vscode.lm` が利用可能な場合は、言語モデルがコード構造を解析して適切なセクション名と階層を提案します。
+   - AIモデルが利用できない環境や `mokuji.ai.enabled` が `"off"` の場合は、自動的に**オフラインのコード構造ルール**にフォールバックします。
+2. **Language Model Tool `mokuji_getToc` (`#mokujiToc`)**
+   ファイルのMokuji目次（見出し、階層レベル、1始まりの行範囲）をCopilot Agentモード等へ公開します。チャットで `#mokujiToc` を参照するかAIエージェントが `mokuji_getToc` を呼び出すことで、巨大なファイルでも全文を読み込まずに目的のセクションを素早く特定できます。
+3. **AI向け見出し規約ファイルの生成 (`Mokuji: Generate AI Heading Instructions`)**
+   現在のワークスペース設定（`mokuji.headingMarkers` や `.vscode/mokuji.json` を含む）を反映したMokujiコメント規約を `AGENTS.md`、`.github/copilot-instructions.md`、または `CLAUDE.md` に出力し、外部のAIコーディングアシスタントが一貫して正しいMokuji見出しを記述できるようにします。
+
 ## 設定
 
 Mokujiは言語IDごとに以下の**優先順位**でパターンを適用します：
@@ -286,11 +330,41 @@ Mokujiは言語IDごとに以下の**優先順位**でパターンを適用し�
 
 上記の設定では、Rubyファイルで `# = Section` がレベル1、`# == Subsection` がレベル2として検出され、SQLファイルで `-- # Queries` がレベル1として検出されます。
 
+### 4. カーソル連動の切り替え (`mokuji.syncCursor`)
+
+エディタのカーソル移動に合わせて、Mokujiサイドバー上の現在のセクションを自動的にハイライト表示します（デフォルト: `true`）。
+
+```json
+{
+  "mokuji.syncCursor": true
+}
+```
+
+### 5. 見出しLintとQuick Fix (`mokuji.lint.enabled`)
+
+スペース抜けの見出しコメント、見出しレベルの飛び越し、重複見出しに対する診断（警告）とQuick Fixを有効にします（デフォルト: `true`）。
+
+```json
+{
+  "mokuji.lint.enabled": true
+}
+```
+
+### 6. AI連携モード (`mokuji.ai.enabled`)
+
+`Mokuji: Suggest Section Headings` 実行時にVS CodeのLanguage Model API（`vscode.lm`）を利用するかどうかを制御します。`"auto"`（デフォルト）では利用可能なモデルがあれば使用し、なければオフライン規則へ自動フォールバックします。`"off"` では常にオフライン規則のみを使用します。
+
+```json
+{
+  "mokuji.ai.enabled": "auto"
+}
+```
+
 ## インストール
 
 ### VS Code Marketplaceから
 
-VS Codeの拡張機能ビューで「Mokuji」を検索してインストール。
+VS Codeの拡張機能ビューで「Mokuji」を検索してインストール（VS Code `1.95.0` 以上が必要）。
 
 ### 開発版の実行
 
@@ -309,7 +383,13 @@ npm install
 npm run compile
 
 # ユニットテストの実行
-npm test
+npm run test:unit
+
+# VS Code統合テストの実行
+npm run test:integration
+
+# ヘッドレスLinux環境での統合テスト実行
+xvfb-run -a npm run test:integration
 
 # ウォッチモード（自動コンパイル）
 npm run watch

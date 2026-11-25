@@ -3,7 +3,7 @@
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
   "description": "Table of Contents generator for CSS, HTML, Markdown, JavaScript, TypeScript, Python, Java, Go, Vue, Svelte, and React files",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "license": "MIT",
   "icon": "icon.png",
   "keywords": [
@@ -29,7 +29,9 @@
     "svelte",
     "react",
     "jsx",
-    "tsx"
+    "tsx",
+    "ai",
+    "copilot"
   ],
   "repository": {
     "type": "git",
@@ -40,7 +42,7 @@
   },
   "homepage": "https://github.com/tottomotomotomo/mokuji#readme",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.95.0"
   },
   "categories": [
     "Other"
@@ -67,6 +69,114 @@
         }
       ]
     },
+    "commands": [
+      {
+        "command": "mokuji.refresh",
+        "title": "Mokuji: Refresh Table of Contents",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "mokuji.nextSection",
+        "title": "Mokuji: Go to Next Section",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "mokuji.prevSection",
+        "title": "Mokuji: Go to Previous Section",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "mokuji.insertSection",
+        "title": "Mokuji: Insert Section Heading",
+        "icon": "$(add)"
+      },
+      {
+        "command": "mokuji.suggestSections",
+        "title": "Mokuji: Suggest Section Headings",
+        "icon": "$(sparkle)"
+      },
+      {
+        "command": "mokuji.applySuggestedSections",
+        "title": "Mokuji: Apply Suggested Section Headings"
+      },
+      {
+        "command": "mokuji.generateAiInstructions",
+        "title": "Mokuji: Generate AI Heading Instructions"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "mokuji.suggestSections",
+          "when": "view == mokujiView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mokuji.prevSection",
+          "when": "view == mokujiView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mokuji.nextSection",
+          "when": "view == mokujiView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "mokuji.refresh",
+          "when": "view == mokujiView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "mokuji.insertSection",
+          "when": "view == mokujiView",
+          "group": "1_edit@1"
+        },
+        {
+          "command": "mokuji.generateAiInstructions",
+          "when": "view == mokujiView",
+          "group": "2_ai@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "mokuji.applySuggestedSections",
+          "when": "mokuji.hasPendingSuggestion"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "mokuji.nextSection",
+        "key": "ctrl+alt+]",
+        "mac": "cmd+alt+]",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "mokuji.prevSection",
+        "key": "ctrl+alt+[",
+        "mac": "cmd+alt+[",
+        "when": "editorTextFocus"
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "mokuji_getToc",
+        "displayName": "Get Mokuji Table of Contents",
+        "modelDescription": "Extracts the hierarchical comment-based Table of Contents (section headings, levels, and 1-indexed line ranges) from a file using Mokuji rules. Use this before reading large files so you can jump directly to relevant sections.",
+        "canBeReferencedInPrompt": true,
+        "toolReferenceName": "mokujiToc",
+        "icon": "$(list-unordered)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "Workspace-relative or absolute path to the target file. Defaults to the active editor file if omitted."
+            }
+          }
+        }
+      }
+    ],
     "configuration": {
       "title": "Mokuji",
       "properties": {
@@ -87,6 +197,29 @@
           "type": "boolean",
           "default": true,
           "description": "Show line numbers next to each item in the Mokuji panel."
+        },
+        "mokuji.syncCursor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically highlight and reveal the current section in the Mokuji panel when the editor cursor moves."
+        },
+        "mokuji.lint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable diagnostics and Quick Fixes for malformed Mokuji heading comments (such as missing spaces or skipped heading levels)."
+        },
+        "mokuji.ai.enabled": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Use an available VS Code Language Model (vscode.lm) when suggesting sections, and automatically fall back to outline-based rules when unavailable.",
+            "Disable VS Code Language Model calls and always use offline outline-based rules."
+          ],
+          "default": "auto",
+          "description": "Control VS Code Language Model (vscode.lm) usage for section suggestions."
         }
       }
     }
@@ -97,11 +230,15 @@
     "compile:tests": "tsc -p tsconfig.test.json",
     "watch": "tsc -watch -p ./",
     "test:unit": "npm run compile:tests && node --test out-test/test/unit/*.test.js",
+    "test:integration": "npm run compile && npm run compile:tests && vscode-test",
     "test": "npm run test:unit"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.19.43",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "typescript": "^5.0.0"
   }
 }
