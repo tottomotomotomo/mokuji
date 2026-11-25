@@ -2,6 +2,23 @@
 
 All notable changes to the "Mokuji" extension will be documented in this file.
 
+## [0.2.1] - 2026-11-25
+
+### Added
+
+- Support JSX block comments (`{/* ... */}`) when using custom `mokuji.headingMarkers`
+- Pure core parser module and automated unit test suite (`node:test`) with GitHub Actions CI
+
+### Changed
+
+- Updated `README.md` and `README.ja.md` for all v0.2 languages and settings (`.vscode/mokuji.json`, `mokuji.showLineNumber`)
+- Changed `activationEvents` from `*` to `onStartupFinished` and expanded Marketplace `keywords`
+
+### Fixed
+
+- Ignore `#` comments inside fenced code blocks (`` ``` `` / `~~~`) in Markdown files
+- Properly dispose event listeners and file system watchers
+
 ## [0.2.0] - 2026-04-02
 
 ### Added

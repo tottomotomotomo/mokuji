@@ -3,7 +3,8 @@ import { MokujiTreeDataProvider } from './mokujiProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     const mokujiProvider = new MokujiTreeDataProvider();
-    vscode.window.registerTreeDataProvider('mokujiView', mokujiProvider);
+    const treeViewRegistration = vscode.window.registerTreeDataProvider('mokujiView', mokujiProvider);
+    context.subscriptions.push(mokujiProvider, treeViewRegistration);
 }
 
 export function deactivate() { }

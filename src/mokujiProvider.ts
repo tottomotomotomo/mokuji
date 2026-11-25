@@ -1,57 +1,9 @@
 import * as vscode from 'vscode';
+import { parseText } from './core/parser';
+import { TocNode, WorkspaceConfig } from './core/types';
 
-// グループ1: ハッシュ記号(1-6個) = レベル
-// グループ2: ヘッダーテキスト = ラベル
-type PatternName = 'slash' | 'block' | 'html' | 'md' | 'jsdoc' | 'hashComment' | 'jsxBlock';
-
-// .vscode/mokuji.json のワークスペース設定の型
-interface WorkspacePattern {
-    regex: string;      // 正規表現文字列
-    levelGroup: number; // レベルを表すキャプチャグループ番号（1-indexed）
-    labelGroup: number; // ラベルを表すキャプチャグループ番号（1-indexed）
-}
-
-interface WorkspaceConfig {
-    parsers: Record<string, { patterns: WorkspacePattern[] }>;
-}
-
-const PATTERNS: Record<PatternName, RegExp> = {
-    // // # text (SCSS/LESS/JS/TS/Go style)
-    slash:       /^\s*\/\/ (#+) (.*)$/,
-    // /* # text */ (CSS/SCSS/LESS/Go style)
-    block:       /^\s*\/\* (#+) (.*?) \*\/\s*$/,
-    // <!-- # text --> (HTML/Vue/Svelte style)
-    html:        /^\s*<!--\s*(#+)\s*(.*?)\s*-->/,
-    // # text (Markdown native headers, trailing hashes are optional and removed)
-    md:          /^\s*(#{1,6})\s+(.+?)(?:\s+#+)?$/,
-    // /** # text */ (JSDoc style for JS/TS/Java)
-    jsdoc:       /^\s*\/\*\*\s*(#+)\s*(.*?)\s*\*\/\s*$/,
-    // # # text (Python: hash comment with level marker)
-    // 先頭の # はコメント記号、その後の #+  がレベル指定
-    hashComment: /^\s*#\s+(#{1,6})\s+(.+)$/,
-    // {/* # text */} (JSX/TSX style)
-    jsxBlock:    /^\s*\{\/\*\s*(#+)\s*(.*?)\s*\*\/\}\s*$/,
-};
-
-const LANGUAGE_PATTERNS: Record<string, PatternName[]> = {
-    css:              ['block'],
-    scss:             ['slash', 'block'],
-    less:             ['slash', 'block'],
-    html:             ['html'],
-    markdown:         ['md'],
-    javascript:       ['slash', 'block', 'jsdoc'],
-    typescript:       ['slash', 'block', 'jsdoc'],
-    javascriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
-    typescriptreact:  ['slash', 'block', 'jsdoc', 'jsxBlock'],
-    python:           ['hashComment'],
-    java:             ['slash', 'block', 'jsdoc'],
-    go:               ['slash', 'block'],
-    vue:              ['html', 'slash', 'block', 'jsdoc'],
-    svelte:           ['html', 'slash', 'block', 'jsdoc'],
-};
-
-export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<MokujiItem | undefined | null | void> = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
+export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiItem>, vscode.Disposable {
+    private readonly _onDidChangeTreeData = new vscode.EventEmitter<MokujiItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<MokujiItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
     // Preserve the last document to maintain TOC when activeTextEditor becomes undefined
@@ -60,23 +12,37 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     // .vscode/mokuji.json のキャッシュ
     private workspaceConfig: WorkspaceConfig | null = null;
 
+    private readonly disposables: vscode.Disposable[] = [];
+
     constructor() {
-        vscode.window.onDidChangeActiveTextEditor(() => this.refresh());
-        vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e));
-        vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('mokuji')) {
-                this.refresh();
-            }
-        });
+        this.disposables.push(
+            this._onDidChangeTreeData,
+            vscode.window.onDidChangeActiveTextEditor(() => this.refresh()),
+            vscode.workspace.onDidChangeTextDocument(e => this.onDocumentChanged(e)),
+            vscode.workspace.onDidChangeConfiguration(e => {
+                if (e.affectsConfiguration('mokuji')) {
+                    this.refresh();
+                }
+            })
+        );
 
         // ワークスペース設定を初回読み込み
         this.loadWorkspaceConfig();
 
         // .vscode/mokuji.json の変更を監視
         const watcher = vscode.workspace.createFileSystemWatcher('**/.vscode/mokuji.json');
-        watcher.onDidChange(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
-        watcher.onDidCreate(() => { this.loadWorkspaceConfig().then(() => this.refresh()); });
-        watcher.onDidDelete(() => { this.workspaceConfig = null; this.refresh(); });
+        this.disposables.push(
+            watcher,
+            watcher.onDidChange(() => { this.loadWorkspaceConfig().then(() => this.refresh()); }),
+            watcher.onDidCreate(() => { this.loadWorkspaceConfig().then(() => this.refresh()); }),
+            watcher.onDidDelete(() => { this.workspaceConfig = null; this.refresh(); })
+        );
+    }
+
+    dispose(): void {
+        while (this.disposables.length > 0) {
+            this.disposables.pop()?.dispose();
+        }
     }
 
     private async loadWorkspaceConfig(): Promise<void> {
@@ -112,163 +78,53 @@ export class MokujiTreeDataProvider implements vscode.TreeDataProvider<MokujiIte
     getChildren(element?: MokujiItem): Thenable<MokujiItem[]> {
         if (element) {
             return Promise.resolve(element.children);
-        } else {
-            const editor = vscode.window.activeTextEditor;
-
-            // Use active editor's document if available, otherwise use last document
-            const document = editor?.document ?? this.lastDocument;
-
-            if (document) {
-                // Update lastDocument only when we have a valid text editor
-                if (editor) {
-                    this.lastDocument = document;
-                }
-
-                const config = vscode.workspace.getConfiguration('mokuji');
-                const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
-                const showLineNumber = config.get<boolean>('showLineNumber', true);
-                const items = this.parseDocument(document, headingMarkers, showLineNumber);
-
-                // Add file name header as the first item
-                const fileName = document.uri.path.split('/').pop() || '';
-                const fileHeader = new MokujiFileHeader(fileName, document.uri);
-
-                return Promise.resolve([fileHeader, ...items]);
-            }
-            return Promise.resolve([]);
         }
+
+        const editor = vscode.window.activeTextEditor;
+
+        // Use active editor's document if available, otherwise use last document
+        const document = editor?.document ?? this.lastDocument;
+
+        if (document) {
+            // Update lastDocument only when we have a valid text editor
+            if (editor) {
+                this.lastDocument = document;
+            }
+
+            const config = vscode.workspace.getConfiguration('mokuji');
+            const headingMarkers = config.get<Record<string, string[]>>('headingMarkers', {});
+            const showLineNumber = config.get<boolean>('showLineNumber', true);
+
+            const nodes = parseText(document.getText(), {
+                languageId: document.languageId,
+                headingMarkers,
+                workspaceConfig: this.workspaceConfig,
+            });
+            const items = this.toTreeItems(nodes, document.uri, showLineNumber);
+
+            // Add file name header as the first item
+            const fileName = document.uri.path.split('/').pop() || '';
+            const fileHeader = new MokujiFileHeader(fileName, document.uri);
+
+            return Promise.resolve([fileHeader, ...items]);
+        }
+        return Promise.resolve([]);
     }
 
-    private parseDocument(
-        document: vscode.TextDocument,
-        headingMarkers: Record<string, string[]> = {},
-        showLineNumber: boolean = true
-    ): MokujiItem[] {
-        const items: MokujiItem[] = [];
-        const stack: { level: number, item: MokujiItem }[] = [];
-        const langId = document.languageId;
-        const documentUri = document.uri;
-
-        // Get heading markers for this language (e.g., ["@", "$", "&"])
-        const markers = headingMarkers[langId] || [];
-
-        for (let i = 0; i < document.lineCount; i++) {
-            const line = document.lineAt(i);
-            const text = line.text;
-
-            let level: number | null = null;
-            let label: string | null = null;
-
-            // Priority 1: Heading markers (if configured for this language)
-            if (markers.length > 0) {
-                const markerResult = this.matchHeadingMarker(text, markers);
-                if (markerResult) {
-                    level = markerResult.level;
-                    label = markerResult.label;
-                }
-            }
-
-            // Priority 2: Workspace patterns (.vscode/mokuji.json)
-            // headingMarkersが未設定かつワークスペース設定がある場合に適用
-            if (level === null && markers.length === 0) {
-                const wsPatterns = this.workspaceConfig?.parsers?.[langId]?.patterns;
-                if (wsPatterns) {
-                    for (const wp of wsPatterns) {
-                        try {
-                            const match = text.match(new RegExp(wp.regex));
-                            if (match) {
-                                const rawLevel = match[wp.levelGroup];
-                                level = typeof rawLevel === 'string' ? rawLevel.length : null;
-                                label = match[wp.labelGroup]?.trim() ?? null;
-                                break;
-                            }
-                        } catch {
-                            // 無効な正規表現はスキップ
-                        }
-                    }
-                }
-            }
-
-            // Priority 3: Default patterns (only if headingMarkers and workspace patterns are NOT configured)
-            // 言語IDに対応するパターンのみ試行する（未登録言語は検出しない）
-            if (level === null && markers.length === 0 && !this.workspaceConfig?.parsers?.[langId]) {
-                const activePatternNames = LANGUAGE_PATTERNS[langId];
-                if (activePatternNames) {
-                    for (const patternName of activePatternNames) {
-                        const match = text.match(PATTERNS[patternName]);
-                        if (match) {
-                            level = match[1].length;
-                            label = match[2].trim();
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (level !== null && label !== null) {
-                const item = new MokujiItem(label, vscode.TreeItemCollapsibleState.None, i, documentUri, showLineNumber);
-
-                // Find parent
-                while (stack.length > 0 && stack[stack.length - 1].level >= level) {
-                    stack.pop();
-                }
-
-                if (stack.length > 0) {
-                    const parent = stack[stack.length - 1].item;
-                    parent.children.push(item);
-                    parent.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
-                } else {
-                    items.push(item);
-                }
-
-                stack.push({ level, item });
-            }
-        }
-
-        return items;
-    }
-
-    /**
-     * Match heading markers in a line of text.
-     * Supports common comment formats: #, //, block comments, HTML comments
-     * @param text The line text to match
-     * @param markers Array of markers for each level (index 0 = level 1)
-     * @returns level and label if matched, null otherwise
-     */
-    private matchHeadingMarker(text: string, markers: string[]): { level: number; label: string } | null {
-        for (let i = 0; i < markers.length; i++) {
-            const marker = markers[i];
-            const escapedMarker = marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-            // Pattern for different comment styles:
-            // - # marker text (Python, Ruby, Shell, YAML)
-            // - // marker text (JS, TS, C++, etc.)
-            // - /* marker text */ (CSS, C, etc.)
-            // - /** marker text */ (JSDoc)
-            // - <!-- marker text --> (HTML, XML)
-            const patterns = [
-                new RegExp(`^\\s*#\\s*${escapedMarker}\\s+(.+)$`),
-                new RegExp(`^\\s*\\/\\/\\s*${escapedMarker}\\s+(.+)$`),
-                new RegExp(`^\\s*\\/\\*\\s*${escapedMarker}\\s+(.+?)\\s*\\*\\/\\s*$`),
-                new RegExp(`^\\s*\\/\\*\\*\\s*${escapedMarker}\\s+(.+?)\\s*\\*\\/\\s*$`),
-                new RegExp(`^\\s*<!--\\s*${escapedMarker}\\s+(.+?)\\s*-->`)
-            ];
-
-            for (const pattern of patterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    return {
-                        level: i + 1,
-                        label: match[1].trim()
-                    };
-                }
-            }
-        }
-        return null;
+    private toTreeItems(nodes: readonly TocNode[], documentUri: vscode.Uri, showLineNumber: boolean): MokujiItem[] {
+        return nodes.map(node => {
+            const children = this.toTreeItems(node.children, documentUri, showLineNumber);
+            const collapsibleState = children.length > 0
+                ? vscode.TreeItemCollapsibleState.Expanded
+                : vscode.TreeItemCollapsibleState.None;
+            const item = new MokujiItem(node.label, collapsibleState, node.line, documentUri, showLineNumber);
+            item.children = children;
+            return item;
+        });
     }
 }
 
-class MokujiItem extends vscode.TreeItem {
+export class MokujiItem extends vscode.TreeItem {
     public children: MokujiItem[] = [];
 
     constructor(
