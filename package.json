@@ -3,7 +3,7 @@
   "displayName": "Mokuji",
   "publisher": "tottomotomotomo",
   "description": "Table of Contents generator for CSS, HTML, Markdown, JavaScript, TypeScript, Python, Java, Go, Vue, Svelte, and React files",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "icon": "icon.png",
   "keywords": [
@@ -21,7 +21,15 @@
     "heading",
     "javascript",
     "typescript",
-    "jsdoc"
+    "jsdoc",
+    "python",
+    "java",
+    "go",
+    "vue",
+    "svelte",
+    "react",
+    "jsx",
+    "tsx"
   ],
   "repository": {
     "type": "git",
@@ -38,7 +46,7 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -86,11 +94,14 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "compile:tests": "tsc -p tsconfig.test.json",
+    "watch": "tsc -watch -p ./",
+    "test:unit": "npm run compile:tests && node --test out-test/test/unit/*.test.js",
+    "test": "npm run test:unit"
   },
   "devDependencies": {
+    "@types/node": "^20.19.43",
     "@types/vscode": "^1.80.0",
-    "@types/node": "16.x",
     "typescript": "^5.0.0"
   }
 }
