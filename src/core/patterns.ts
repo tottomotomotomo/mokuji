@@ -1,4 +1,4 @@
-// VS Code API に依存しない言語別見出し正規表現パターン定義
+// VS Code API に依存しない言語別見出し正規表現パターン & 書式フォーマッター定義
 
 import { PatternName } from './types';
 
@@ -40,3 +40,92 @@ export const LANGUAGE_PATTERNS: Record<string, PatternName[]> = {
 };
 
 export const SUPPORTED_LANGUAGE_IDS: readonly string[] = Object.keys(LANGUAGE_PATTERNS);
+
+// 言語ごとの標準コメントラッパー種別（headingMarkers 使用時や見出し生成時に利用）
+export type CommentStyle = 'slash' | 'block' | 'html' | 'md' | 'hash' | 'jsxBlock';
+
+export const PRIMARY_COMMENT_STYLE: Record<string, CommentStyle> = {
+    css: 'block',
+    scss: 'slash',
+    less: 'slash',
+    html: 'html',
+    markdown: 'md',
+    javascript: 'slash',
+    typescript: 'slash',
+    javascriptreact: 'slash',
+    typescriptreact: 'slash',
+    python: 'hash',
+    java: 'slash',
+    go: 'slash',
+    vue: 'slash',
+    svelte: 'slash',
+    ruby: 'hash',
+    shellscript: 'hash',
+    yaml: 'hash',
+};
+
+/**
+ * 指定された言語ID・レベル(1-6)・ラベル・カスタムマーカーから、
+ * Mokuji が認識可能な1行の見出しコメント文字列を生成する。
+ * 対応していない言語かつ headingMarkers 未設定の場合は null を返す。
+ */
+export function formatHeadingComment(
+    languageId: string,
+    level: number,
+    label: string,
+    headingMarkers: Record<string, string[]> = {},
+    indent: string = ''
+): string | null {
+    const clampedLevel = Math.min(6, Math.max(1, Math.floor(level)));
+    const cleanLabel = label.trim();
+    if (!cleanLabel) {
+        return null;
+    }
+
+    const customMarkers = headingMarkers[languageId];
+    if (customMarkers && customMarkers.length > 0) {
+        if (clampedLevel > customMarkers.length) {
+            return null;
+        }
+        const marker = customMarkers[clampedLevel - 1];
+        const style = PRIMARY_COMMENT_STYLE[languageId] ?? 'slash';
+        switch (style) {
+            case 'block':
+                return `${indent}/* ${marker} ${cleanLabel} */`;
+            case 'html':
+                return `${indent}<!-- ${marker} ${cleanLabel} -->`;
+            case 'jsxBlock':
+                return `${indent}{/* ${marker} ${cleanLabel} */}`;
+            case 'hash':
+            case 'md':
+                return `${indent}# ${marker} ${cleanLabel}`;
+            case 'slash':
+            default:
+                return `${indent}// ${marker} ${cleanLabel}`;
+        }
+    }
+
+    const patternNames = LANGUAGE_PATTERNS[languageId];
+    if (!patternNames || patternNames.length === 0) {
+        return null;
+    }
+
+    const hashes = '#'.repeat(clampedLevel);
+    const primary = patternNames[0];
+    switch (primary) {
+        case 'slash':
+            return `${indent}// ${hashes} ${cleanLabel}`;
+        case 'block':
+            return `${indent}/* ${hashes} ${cleanLabel} */`;
+        case 'html':
+            return `${indent}<!-- ${hashes} ${cleanLabel} -->`;
+        case 'md':
+            return `${indent}${hashes} ${cleanLabel}`;
+        case 'jsdoc':
+            return `${indent}/** ${hashes} ${cleanLabel} */`;
+        case 'hashComment':
+            return `${indent}# ${hashes} ${cleanLabel}`;
+        case 'jsxBlock':
+            return `${indent}{/* ${hashes} ${cleanLabel} */}`;
+    }
+}

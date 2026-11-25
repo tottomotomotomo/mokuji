@@ -2,6 +2,27 @@
 
 All notable changes to the "Mokuji" extension will be documented in this file.
 
+## [0.3.0] - 2026-11-25
+
+### Added
+
+- Cursor synchronization (`mokuji.syncCursor`, default: `true`) to automatically highlight and reveal the active section in the Mokuji sidebar, plus TreeView **Collapse All** support
+- Section navigation and refresh commands:
+  - `Mokuji: Go to Next Section` (`mokuji.nextSection`, `Ctrl+Alt+]` / `Cmd+Alt+]`)
+  - `Mokuji: Go to Previous Section` (`mokuji.prevSection`, `Ctrl+Alt+[` / `Cmd+Alt+[`)
+  - `Mokuji: Refresh Table of Contents` (`mokuji.refresh`)
+- Section heading insertion command (`Mokuji: Insert Section Heading`, `mokuji.insertSection`) and `#` snippet completions inside comments
+- Real-time heading lint diagnostics and Quick Fixes (`mokuji.lint.enabled`, default: `true`) for missing spaces (`//# Section` / `// #Section`), skipped heading levels (`#` -> `###`), and duplicate sibling headings
+- Optional AI capabilities powered by VS Code's built-in Language Model API (`vscode.lm`) with 100% offline fallback (`mokuji.ai.enabled`: `"auto"` | `"off"`):
+  - `Mokuji: Suggest Section Headings` (`mokuji.suggestSections`) and `Mokuji: Apply Suggested Section Headings` (`mokuji.applySuggestedSections`) with side-by-side Diff preview and offline code-structure fallback
+  - Language Model Tool `mokuji_getToc` (`#mokujiToc`) exposing hierarchical TOC items and 1-indexed line ranges to Copilot Agent mode
+  - `Mokuji: Generate AI Heading Instructions` (`mokuji.generateAiInstructions`) to generate workspace-aware heading conventions into `AGENTS.md`, `.github/copilot-instructions.md`, or `CLAUDE.md`
+- Automated VS Code Extension Host integration test suite (`@vscode/test-cli` / `@vscode/test-electron`) executed headlessly via `xvfb-run` in GitHub Actions CI
+
+### Changed
+
+- Updated minimum required VS Code engine version from `^1.80.0` to `^1.95.0` for `vscode.lm` and `languageModelTools` support
+
 ## [0.2.1] - 2026-11-25
 
 ### Added
